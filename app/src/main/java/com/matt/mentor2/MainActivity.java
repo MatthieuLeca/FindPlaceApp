@@ -1,11 +1,15 @@
 package com.matt.mentor2;
 
 import android.app.ListActivity;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -20,7 +24,10 @@ import org.json.JSONObject;
 
 
 import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -30,8 +37,8 @@ public class MainActivity extends ListActivity {
 
     final String GOOGLE_KEY = "AIzaSyBDwzhubIO0rNSzxgKxPHTwzOlodWEE7yU";
 
-    final String latitude = "40.7463956";
-    final String longitude = "-73.9852992";
+    String latitude;
+    String longitude;
 
     ArrayAdapter myAdapter;
 
@@ -39,21 +46,41 @@ public class MainActivity extends ListActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        new googleplaces().execute();
+
+        Button butFind = (Button) findViewById(R.id.rechercher);
+        butFind.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                new googleplaces().execute();
+            }
+        });
+
     }
 
     private class googleplaces extends AsyncTask<View,Void,String>{
         String temp;
+        GeoPoint p1;
         @Override
         protected String doInBackground(View... urls) {
-            temp = makeCall("https://maps.googleapis.com/maps/api/place/search/json?location=" + latitude + "," + longitude + "&radius=100&sensor=true&key=" + GOOGLE_KEY);
-            System.out.println("https://maps.googleapis.com/maps/api/place/search/json?location=" + latitude + "," + longitude + "&radius=100&sensor=true&key=" + GOOGLE_KEY);
+            if(p1!=null){
+                latitude = p1.getLatitude();
+                longitude = p1.getLongitude();
+                String strTypes = null;
+                try {
+                    strTypes = URLEncoder.encode("food|cafe|restaurant", "UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+                temp = makeCall("https://maps.googleapis.com/maps/api/place/search/json?location=" + latitude + "," + longitude + "&radius=1000&sensor=true&types=" + strTypes+"&key=" + GOOGLE_KEY);
+                System.out.println("https://maps.googleapis.com/maps/api/place/search/json?location=" + latitude + "," + longitude + "&radius=1000&sensor=true&types=" + strTypes+"&key=" + GOOGLE_KEY);
+            }
             return "";
         }
 
         @Override
         protected void onPreExecute(){
             //Progress Bar?
+            EditText editLieu = (EditText) findViewById(R.id.lieu);
+            p1 = getLocationFromAddress(editLieu.getText().toString());
         }
 
         @Override
@@ -79,6 +106,8 @@ public class MainActivity extends ListActivity {
     }
 
     private static String makeCall(String url) {
+        int MAX_RESULTS = 50;
+
         // string buffers the url
         StringBuffer buffer_string = new StringBuffer(url);
         String replyString = "";
@@ -95,7 +124,7 @@ public class MainActivity extends ListActivity {
 
             // buffer input stream the result
             BufferedInputStream bis = new BufferedInputStream(is);
-            ByteArrayBuffer baf = new ByteArrayBuffer(20);
+            ByteArrayBuffer baf = new ByteArrayBuffer(MAX_RESULTS);
             int current = 0;
             while ((current = bis.read()) != -1) {
                 baf.append((byte) current);
@@ -152,5 +181,32 @@ public class MainActivity extends ListActivity {
         }
         return temp;
 
+    }
+
+    public GeoPoint getLocationFromAddress(String strAddress){
+
+        Geocoder coder = new Geocoder(this);
+        List<Address> address;
+        GeoPoint p1 = null;
+        if(strAddress.isEmpty()){
+            return null;
+        }
+        try {
+            address = coder.getFromLocationName(strAddress,5);
+            if (address==null) {
+                return null;
+            }
+            Address location=address.get(0);
+            location.getLatitude();
+            location.getLongitude();
+
+            p1 = new GeoPoint((double) (location.getLatitude()),
+                    (double) (location.getLongitude()));
+
+            return p1;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }
